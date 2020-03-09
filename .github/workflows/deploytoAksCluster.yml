@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: dsztvqifhpwsqregistry.azurecr.io
+        username: ${{ secrets.acr_dsztvqifhpwsqregistry_username }}
+        password: ${{ secrets.acr_dsztvqifhpwsqregistry_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/elasticsearch" -f  "elasticsearch/Dockerfile" -t dsztvqifhpwsqregistry.azurecr.io/flairk8scluster:${{ github.sha }}
+        docker push dsztvqifhpwsqregistry.azurecr.io/flairk8scluster:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_flairk8scluster_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep flairk8scluster5afa | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace flairk8scluster5afa`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: flairk8scluster5afa
+        container-registry-url: dsztvqifhpwsqregistry.azurecr.io
+        container-registry-username: ${{ secrets.acr_dsztvqifhpwsqregistry_username }}
+        container-registry-password: ${{ secrets.acr_dsztvqifhpwsqregistry_password }}
+        secret-name: flairk8sclusdockerauth
+       
+    - uses: azure/k8s-deploy@v1
+      with:
+        namespace: flairk8scluster5afa
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          dsztvqifhpwsqregistry.azurecr.io/flairk8scluster:${{ github.sha }}
+        imagepullsecrets: |
+          flairk8sclusdockerauth
