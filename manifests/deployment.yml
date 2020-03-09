@@ -1,0 +1,16 @@
+apiVersion : apps/v1beta1
+kind: Deployment
+metadata:
+  name: "flairk8scluster"
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: "flairk8scluster"
+    spec:
+      containers:
+        - name: "flairk8scluster"
+          image: "dsztvqifhpwsqregistry.azurecr.io/flairk8scluster"
+          ports:
+          - containerPort: 80
